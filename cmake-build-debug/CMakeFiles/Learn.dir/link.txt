@@ -1,0 +1,1 @@
+/usr/bin/c++  -g   CMakeFiles/Learn.dir/main.cpp.o CMakeFiles/Learn.dir/MathUtils.cpp.o  -o Learn 
