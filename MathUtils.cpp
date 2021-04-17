@@ -3,7 +3,8 @@
 //
 // currently supports : sqrt , cprt , sin , cos , tan , asin , acos , atan
 //                      csc , sec , cot , acsc , asec , acot , sinh , cosh
-//                      tanh , csch , sech , coth , rand , deg , rad
+//                      tanh , csch , sech , coth , rand , deg , rad , sgn
+//                      log , exp , abs
 //
 // was going to add variable support .. but I have to study integration
 // this thing took me 1+ hour to code already
@@ -14,6 +15,8 @@
 
 #include <iostream>
 #include <cmath>
+#include <ctime>
+#include <vector>
 
 
 using namespace std;
@@ -29,42 +32,76 @@ static char ch;
 static char *i_in;
 static int i_len;
 
-static const char func_sqrt[] = {'s','q','r','t'};
+static const char func_sqrt[] = "sqrt";
+static const char func_deg[] = "deg";
+static const char func_rad[] = "rad";
 
-static const char func_deg[] = {'d','e','g'};
-static const char func_rad[] = {'r','a','d'};
+static const long double DEG_TO_RAD =       M_PI / 180.0;
+static const long double RAD_TO_DEG =       180.0 / M_PI;
 
-#define DEG_TO_RAD  M_PI/180.0;
-#define RAD_TO_DEG  180.0/M_PI;
+static const char func_sin[] = "sin";
+static const char func_cos[] = "cos";
+static const char func_tan[] = "tan";
 
-static const char func_sin[] = {'s','i','n'};
-static const char func_cos[] = {'c','o','s'};
-static const char func_tan[] = {'t','a','n'};
+static const char func_asin[] = "asin";
+static const char func_acos[] = "acos";
+static const char func_atan[] = "atan";
 
-static const char func_asin[] = {'a','s','i','n'};
-static const char func_acos[] = {'a','c','o','s'};
-static const char func_atan[] = {'a','t','a','n'};
+static const char func_csc[] = "csc";
+static const char func_sec[] = "sec";
+static const char func_cot[] = "cot";
 
-static const char func_csc[] = {'c','s','c'};
-static const char func_sec[] = {'s','e','c'};
-static const char func_cot[] = {'c','o','t'};
+static const char func_acsc[] = "acsc";
+static const char func_asec[] = "asec";
+static const char func_acot[] = "acot";
 
-static const char func_acsc[] = {'a','c','s','c'};
-static const char func_asec[] = {'a','s','e','c'};
-static const char func_acot[] = {'a','c','o','t'};
+static const char func_cbrt[] = "cbrt";
 
-static const char func_cbrt[] = {'c','b','r','t'};
+static const char func_sinh[] = "sinh";
+static const char func_cosh[] = "cosh";
+static const char func_tanh[] = "tanh";
 
-static const char func_sinh[] = {'s','i','n','h'};
-static const char func_cosh[] = {'c','o','s','h'};
-static const char func_tanh[] = {'t','a','n','h'};
+static const char func_csch[] = "csch";
+static const char func_sech[] = "sech";
+static const char func_coth[] = "coth";
 
-static const char func_csch[] = {'c','s','c','h'};
-static const char func_sech[] = {'s','e','c','h'};
-static const char func_coth[] = {'c','o','t','h'};
+static const char func_rand[]  = "rand";
+static const char func_log[]   = "log";
+static const char func_exp[]   = "exp";
+static const char func_sgn[]   = "sgn";
+static const char func_abs[]   = "abs";
+static const char func_pow[]   = "pow";
+static const char func_min[]   = "min";
+static const char func_max[]   = "max";
 
-static const char func_rand[] = {'r','a','n','d'};
+static vector<string> variables_names;
+static vector<long double> variables_values;
 
+static vector<string> func_names;
+static vector<string> func_expressions;
+static vector<vector<string>> func_params;
+
+static vector<string> local_variables_names;
+static vector<long double> local_variables_values;
+
+extern void MathInit(){
+    variables_names.emplace_back("pi");
+    variables_values.emplace_back(M_PI);
+
+    variables_names.emplace_back("PI");
+    variables_values.emplace_back(M_PI);
+
+    variables_names.emplace_back("e");
+    variables_values.emplace_back(M_E);
+
+    variables_names.emplace_back("DEG_TO_RAD");
+    variables_values.emplace_back(DEG_TO_RAD);
+
+    variables_names.emplace_back("RAD_TO_DEG");
+    variables_values.emplace_back(RAD_TO_DEG);
+
+
+}
 
 //Char Array comparison function
 //if both have the same elements .. then return true other wise false
@@ -138,20 +175,23 @@ static long double parseFactor() {
     if (eat('+')) return parseFactor(); // unary plus
     if (eat('-')) return -parseFactor(); // unary minus
 
+    if (pos == i_len) return 0.0; //passed the size;
+
     long double x = 0;
     int startPos = pos;
     if (eat('(')) { // parentheses
         x = parseExpression();
         eat(')');
     } else if ((ch >= '0' && ch <= '9') || ch == '.') { // numbers
-        while ((ch >= '0' && ch <= '9') || ch == '.') nextChar();
+        while ((ch >= '0' && ch <= '9') || ch == '.' || ch == 'E') nextChar();
         char* num = supchar(startPos , pos);
         //cout << "S: " << startPos << "  E: " << pos << endl;
 
         //cout << "Parsing Number : " << num << endl;
-        x = atof(num);
-    } else if (ch >= 'a' && ch <= 'z') { // functions
-        while (ch >= 'a' && ch <= 'z') nextChar();
+        x = strtod(num , nullptr); //str_to_d
+
+    } else if ((ch >= 'a' && ch <= 'z') || (ch >= 'A' && ch <= 'Z') || (ch == '_')) { // functions
+        while ((ch >= 'a' && ch <= 'z') || (ch >= 'A' && ch <= 'Z') || (ch == '_')) nextChar();
         char* func = supchar(startPos , pos);
         int s1 = pos - startPos;
 
@@ -225,10 +265,10 @@ static long double parseFactor() {
             x = 1.0 / tanh(parseFactor());
         }
         else if (charequal(func , func_rand , s1 , 4)){
-            long double arg1 = -1;         //from
-            long double arg2 = 1;     //to
+            long double arg1 = 0;         //from
+            long double arg2 = 1;         //to
             long arg3 = time(NULL); //seed
-            if (eat('(')){
+            if (eat('(') && !eat(')')){
                 arg2 = parseExpression();
                 if (eat(',')) {
                     long double t = arg2;
@@ -239,10 +279,8 @@ static long double parseFactor() {
                     arg3 = long(parseExpression());
 
                 eat(')');
-
             }else{
-                arg1 = 0;
-                arg2 = parseFactor();
+                cout << "(Error) rand usage is rand(t) or rand(f,t) or rand(f,t,s) returning [0,1]" << endl;
             }
 
             srand(arg3);
@@ -250,8 +288,115 @@ static long double parseFactor() {
 
             x = (arg2 - arg1) * r + arg1;
 
-        }else{
-            cout << "(Error) Unknown function: " << func << endl;
+        }
+        else if (charequal(func , func_log , s1 , 3)){
+            long double arg1 = 1;
+            long double arg2 = M_E;
+            if (eat('(') && !eat(')')){
+                arg1 = parseExpression();
+                if (eat(','))
+                    arg2 = parseExpression();
+                eat(')');
+            }else{
+                cout << "(Error) log usage is log(n) or log(n,e) returning 0" << endl;
+            }
+
+            x = log(arg1) / log(arg2);
+        }
+        else if (charequal(func , func_pow , s1 , 3)){
+            long double arg1 = 0;
+            long double arg2 = 0;
+            if (eat('(') && !eat(')')){
+                arg1 = parseExpression();
+                if (eat(',')) {
+                    arg2 = parseExpression();
+                    x = pow(arg1 , arg2);
+                }else{
+                    cout << "(Error) pow usage is pow(base,power) returning 1" << endl;
+                    x = 1.0;
+                }
+                eat(')');
+            }else{
+                cout << "(Error) pow usage is pow(base,power) returning 1" << endl;
+                x = 1.0;
+            }
+        }
+        else if (charequal(func , func_min , s1 , 3)){
+            long double arg1 = 0;
+            long double arg2 = 0;
+            if (eat('(') && !eat(')')){
+                arg1 = parseExpression();
+                if (eat(',')) {
+                    arg2 = parseExpression();
+                    x = min(arg1 , arg2);
+                }else{
+                    cout << "(Error) min usage is min(n1,n2) returning 0" << endl;
+                    x = 0.0;
+                }
+                eat(')');
+            }else{
+                cout << "(Error) min usage is min(n1,n2) returning 0" << endl;
+                x = 0.0;
+            }
+        }
+        else if (charequal(func , func_max , s1 , 3)){
+            long double arg1 = 0;
+            long double arg2 = 0;
+            if (eat('(') && !eat(')')){
+
+                arg1 = parseExpression();
+                if (eat(',')) {
+                    arg2 = parseExpression();
+                    x = max(arg1 , arg2);
+                }else{
+                    cout << "(Error) max usage is max(n1,n2) returning 0" << endl;
+                    x = 0.0;
+                }
+                eat(')');
+            }else{
+                cout << "(Error) max usage is max(n1,n2) returning 0" << endl;
+                x = 0.0;
+            }
+        }
+        else if (charequal(func , func_exp , s1 , 3)){
+            x = exp(parseFactor());
+        }
+        else if (charequal(func , func_sgn , s1 , 3)){
+            x = parseFactor();
+
+            if (x > 0){
+                x = 1.0;
+            }else if (x < 0){
+                x = -1.0;
+            }else{
+                x = 0.0;
+            }
+        }
+        else if (charequal(func , func_abs , s1 , 3)){
+            x = abs(parseFactor());
+        }
+        else{
+
+            string str;
+            str.append(func);
+            if (eat('(')){ //a function
+                pos = i_len;
+                x = 0.0;
+                cout << "(Error) Unknown function: " << str << endl;
+            }
+            else {
+                bool found = false;
+                for (int i = 0; i < variables_names.size(); ++i) {
+                    if (variables_names.at(i) == str) {
+                        x = variables_values.at(i);
+                        found = true;
+                        break;
+                    }
+                }
+
+                if (!found)
+                    cout << "(Error) Unknown variable: " << str << endl;
+            }
         }
 
     } else {
@@ -264,6 +409,8 @@ static long double parseFactor() {
 
     return x;
 }
+
+
 
 extern long double eval(char *input , int len){
     pos = -1;
@@ -279,4 +426,34 @@ extern long double eval(char *input , int len){
 
     return output;
 }
+
+extern void setVariable(const string& name , long double value){
+    for (int i = 0; i < variables_names.size(); ++i) {
+        if (variables_names.at(i) == name){
+            variables_values[i] = value;
+            return;
+        }
+    }
+
+    variables_names.emplace_back(name);
+    variables_values.emplace_back(value);
+}
+
+extern void defineFunction(const std::string& name , const std::vector<std::string>& params , const std::string& expression){
+
+    for (int i = 0; i < func_names.size(); ++i) {
+        if (func_names[i] == name){
+            func_names[i]         = name;
+            func_params[i]        = params;
+            func_expressions[i]   = expression;
+            break;
+        }
+    }
+
+    func_names            .emplace_back(name);
+    func_params           .emplace_back(params);
+    func_expressions      .emplace_back(expression);
+
+}
+
 
